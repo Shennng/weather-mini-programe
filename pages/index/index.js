@@ -20,7 +20,8 @@ Page({
   data: {
     nowTemp: "14°",
     nowWeather: "晴天",
-    nowWeatherBackground: ''
+    nowWeatherBackground: '',
+    hourlyWeather: []
   },
   onPullDownRefresh() {
     this.getNow(() => {
@@ -34,29 +35,49 @@ Page({
     wx.request({
       url: 'https://test-miniprogram.com/api/weather/now',
       data: {
-        city: '广州市'
+        city: '湘潭市'
       },
       success: res => {
         let result = res.data.result;
-        let temp = result.now.temp;
-        let weather = result.now.weather;
-        this.setData({
-          nowTemp: temp + '°',
-          nowWeather: weatherMap[weather],
-          nowWeatherBackground: '/images/' + weather + '-bg.png'
-        });
-        wx.setNavigationBarColor({
-          frontColor: '#ffffff',
-          backgroundColor: weatherColorMap[weather],
-          animation: {
-            duration: 500,
-            timingFunc: 'easeOut'
-          }
-        });
+        this.setNow(result);
+        this.setHourlyWeather(result);
       },
       complete: () => {
         callback && callback()
       }
+    })
+  },
+  setNow(result) {
+    let temp = result.now.temp;
+    let weather = result.now.weather;
+    this.setData({
+      nowTemp: temp + '°',
+      nowWeather: weatherMap[weather],
+      nowWeatherBackground: '/images/' + weather + '-bg.png'
+    });
+    wx.setNavigationBarColor({
+      frontColor: '#ffffff',
+      backgroundColor: weatherColorMap[weather],
+      animation: {
+        duration: 500,
+        timingFunc: 'easeOut'
+      }
+    });
+  },
+  setHourlyWeather(result) {
+    let hourlyWeather = [];
+    let nowHour = new Date().getHours();
+    let forecast = result.forecast;
+    for (let i = 0; i < 8; i ++) {
+      hourlyWeather.push({
+        time: (i*3 + nowHour) % 24 + '时',
+        iconPath: '/images/' + forecast[i].weather + '-icon.png',
+        temp: forecast[i].temp + '°'
+      })
+    };
+    hourlyWeather[0].time = "现在";
+    this.setData({
+      hourlyWeather: hourlyWeather
     })
   }
 })
