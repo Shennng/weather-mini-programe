@@ -16,12 +16,23 @@ const weatherColorMap = {
   'snow': '#aae1fc'
 }
 
+const QQMapWX = require('../../libs/qqmap-wx-jssdk.js')
+
+const UNPROMPTED = 0  //未弹窗提示
+const UNAUTHORIZED = 1  //被拒绝
+const AUTHORIZED = 2  //已允许
+
+
 Page({
   data: {
     nowTemp: "14°",
     nowWeather: "晴天",
     nowWeatherBackground: '',
-    hourlyWeather: []
+    hourlyWeather: [],
+    todayTemp:'',
+    todayDate:'',
+    city:'北京市',
+    locationAuthType: UNPROMPTED,
   },
   onPullDownRefresh() {
     this.getNow(() => {
@@ -29,18 +40,39 @@ Page({
     })
   },
   onLoad() {
-    this.getNow()
+    this.qqmapsdk = new QQMapWX({
+      key: 'DL5BZ-YH5RV-WBQP3-UGY4N-DK2ZK-MXFDL'
+    });
+    wx.getSetting({
+      success: res => {
+        let auth = res.authSetting["scope.userLocation"];
+        this.setData({
+          locationAuthType: (
+            auth? AUTHORIZED : (auth===false)? UNAUTHORIZED : UNPROMPTED)
+          })
+        if (auth) {
+          this.getCityAndWeather();
+        } else {
+          this.getNow();
+        }
+        }
+    });
   },
   getNow(callback) {
     wx.request({
       url: 'https://test-miniprogram.com/api/weather/now',
       data: {
-        city: '湘潭市'
+        city: this.data.city
       },
       success: res => {
         let result = res.data.result;
         this.setNow(result);
         this.setHourlyWeather(result);
+        this.setToday(result);
+        console.log(result);
+      },
+      fail: res => {
+        console.log("天气数据获取失败" + res);
       },
       complete: () => {
         callback && callback()
@@ -78,6 +110,51 @@ Page({
     hourlyWeather[0].time = "现在";
     this.setData({
       hourlyWeather: hourlyWeather
+    })
+  },
+  setToday(result) {
+    let date = new Date();
+    this.setData({
+      todayTemp:`${result.today.minTemp}° 
+      - ${result.today.maxTemp}°`,
+      todayDate:`${date.getFullYear()}
+      -${date.getMonth() + 1}-${date.getDate()} 今天`
+    })
+  },
+  onTapDayWeather() {
+    wx.navigateTo({
+      url: "/pages/list/list?city=" + this.data.city
+    })
+  },
+  onTapLocation() {
+    this.getCityAndWeather()
+  },
+  getCityAndWeather() {
+    wx.getLocation({
+      success: res => {
+        this.setData({
+          locationAuthType: AUTHORIZED
+        });
+        this.qqmapsdk.reverseGeocoder({
+          location: {
+            latitude: res.latitude,
+            longitude: res.longitude
+          },
+          success: res => {
+            let city = res.result.address_component.city;
+            this.setData({
+              city: city,
+            });
+            console.log(city);
+            this.getNow();
+          },
+        });
+      },
+      fail: () => {
+        this.setData({
+          locationAuthType: UNAUTHORIZED
+        })
+      }
     })
   }
 })
